@@ -10,6 +10,7 @@ import { vendorHub } from './vendor-hub.mjs';
 const root = resolve(import.meta.dirname, '..');
 const read = path => readFileSync(join(root, path), 'utf8');
 const original = JSON.parse(read('package.json'));
+const tuiMeta = JSON.parse(read('packages/tui/package.json'));
 const lock = JSON.parse(read('package-lock.json'));
 const version = original.version;
 const name = '@toddzheng024/dscode-bundle';
@@ -24,8 +25,19 @@ const dependencies = {};
 for (const [path, pkg] of Object.entries(lock.packages)) {
   if (path.startsWith('node_modules/@deepseek-ai/') && !path.slice(13).includes('/node_modules/') && !pkg.os && !pkg.cpu) dependencies[path.slice(13)] = pkg.version;
 }
-for (const [pkg] of Object.entries(original.dependencies)) dependencies[pkg] = lock.packages['node_modules/' + pkg].version;
-for (const pkg of ['commander', 'eventsource-parser']) dependencies[pkg] = lock.packages['node_modules/' + pkg].version;
+// The terminal's workspace link has no locked version and is compiled below.
+// Carry its runtime dependencies explicitly; otherwise JSON drops the undefined
+// link version and a clean Hub install never receives packages such as Ink.
+const runtimeDependencies = new Set([
+  ...Object.keys(original.dependencies).filter(pkg => pkg !== tuiMeta.name),
+  ...Object.keys(tuiMeta.dependencies),
+  'eventsource-parser',
+]);
+for (const pkg of runtimeDependencies) {
+  const version = lock.packages['node_modules/' + pkg]?.version;
+  if (!version) throw Error(`Missing locked version for bundle dependency: ${pkg}`);
+  dependencies[pkg] = version;
+}
 const bundle = join(out, 'bundle');
 rmSync(bundle, { recursive: true, force: true }); mkdirSync(bundle);
 write(bundle, 'bootstrap.mjs', read('packages/bundle/bootstrap.mjs').replaceAll("from '../../plugins/tui-tools/", "from './plugins/tui-tools/"));
@@ -58,7 +70,6 @@ buildTui();
 // Keep the source tree's depth: lib/ sits one level under the package, so the compiled
 // '../../../plugins/...' imports resolve to the bundle root exactly as they do in the repo.
 cpSync(join(root, 'packages/tui/lib'), join(bundle, 'vendor/tui/lib'), { recursive: true });
-const tuiMeta = JSON.parse(readFileSync(join(root, 'packages/tui/package.json'), 'utf8'));
 notices.push(`dsh-code (DSCODE vendored terminal, forked from dsh-code@${tuiMeta.version.split('-')[0]}): ${tuiMeta.license}; https://github.com/unlinearity/dsh-code\nLocal changes: DSCODE UI (welcome header, activity line, footer telemetry, effort bar), commands, panels and paste handling.\n`);
 for (const [file, from, to] of [
   ['subagent/index.js', '../../../../plugins/worktree-subagent/worktree.mjs', '../../plugins/worktree-subagent/worktree.mjs'],
