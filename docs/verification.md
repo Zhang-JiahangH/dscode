@@ -1,5 +1,7 @@
 # Current checks — 2026-09-22
 
+Status: living verification record. The maintained gates below include installed terminal imports; dated sections retain the evidence and limits of their original runs.
+
 Run `npm run check` for the maintained regression gate:
 
 | Command | Scope |
@@ -8,7 +10,7 @@ Run `npm run check` for the maintained regression gate:
 | `npm run test:coverage` | The same tests with a full first-party source inventory; unloaded files count as zero; line coverage must remain at least 75% |
 | `npm run typecheck` | The vendored terminal's TypeScript under `packages/tui/tsconfig.json`; run time and build time both erase those types unread, so this is the only static check of them |
 | `npm run test:integration` | Nine deterministic native Harness probes: bridge, messaging, ownership/input boundaries, cards, memory, login, exec, triggers and trigger tools |
-| `npm run test:package` | Build and unpack both npm tarballs; verify integrity, exported files, JS syntax, native lock dependency and absence of local state/build paths |
+| `npm run test:package` | Build and unpack both npm tarballs; verify integrity, exported files, JS syntax, locked terminal runtime dependencies, native lock dependency and absence of local state/build paths |
 | `npm run test:e2e` | The whole gate inside a Linux container, plus the installed-bundle Hub lifecycle; needs a Docker daemon, so it is outside `npm run check` (see below) |
 
 Tests use exact upstream archives verified against package-lock integrity, not already-patched developer dependencies. Cached npm content is read without mutation; cache misses fetch the exact locked tarball. Runtime patches are applied only in per-test temporary directories. The unit runner checks that the developer runtime files remain unchanged. Integration, UI and package checks also use disposable checkouts with local overlays and secrets excluded.
@@ -16,6 +18,8 @@ Tests use exact upstream archives verified against package-lock integrity, not a
 Coverage artifacts are `artifacts/local/coverage/summary.json` and `lcov.info`. The denominator contains first-party `.mjs` runtime, launcher, build and patch files; probe/check fixtures are excluded. Coverage printed by Node itself only measures loaded files and has a different denominator. Generated vendor modules are exercised by behavior and patch contracts, not included as first-party source. The vendored terminal's TypeScript sources are also outside that denominator: `summary.json` reports them under `unmeasured`, and `npm run typecheck` reads them instead (see [maintainability.md](maintainability.md)).
 
 The GitHub Actions workflow runs the gate on macOS with Node 22.19 and 24. Adding the workflow is not evidence of a remote CI pass. Local Unix socket and native flock access are required. No remote inference is performed. Package checks do not replace the separately requested clean npm/Hub install, upgrade/rollback and public-release verification below.
+
+`npm run verify:hub` also runs `scripts/verify-installed-tui.mjs` against the isolated native installation. It imports the bundle's public `/startup` and `/tui` entries and checks their plugin exports, resolving their transitive dependencies from the installed profile. A `--dump-config` success alone does not exercise those imports. The verification receipt records `terminalImports: true`, which publication requires alongside the existing installation and lifecycle checks. This import check does not render the interactive terminal.
 
 ## What cannot run inside a dscode session — 2026-09-17
 

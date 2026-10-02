@@ -33,6 +33,14 @@ try {
       assert.equal(pkg.dependencies.yaml, '2.9.1', 'the launcher carries the YAML parser its trigger CLI reads definitions with');
     }
     else {
+      const terminal = JSON.parse(readFileSync(join(root, 'packages/tui/package.json'), 'utf8'));
+      const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
+      for (const dependency of Object.keys(terminal.dependencies)) {
+        const version = lock.packages['node_modules/' + dependency]?.version;
+        assert(version, `Missing locked terminal dependency: ${dependency}`);
+        assert.equal(pkg.dependencies[dependency], version, `The bundle must carry the locked terminal dependency ${dependency}`);
+      }
+      assert(!Object.hasOwn(pkg.dependencies, terminal.name), 'the terminal is vendored, not a workspace dependency');
       assert.match(readFileSync(join(destination, 'vendor/terminal/index.js'), 'utf8'), /dscode-no-history-expansion-v1/);
       // The preset is a declaration row inside the bundle's own composition patch since
       // DSH 0.1.7 retired preset discovery from directories.
@@ -79,5 +87,5 @@ try {
       if (/\.(?:mjs|js|yml)$/.test(file)) assert(!readFileSync(file, 'utf8').includes(root), `Build path leaked into ${file}`);
     }
   }
-  console.log('Package checks passed: exact tarball integrity, exports, syntax, launcher lock dependency, and no local state/build paths.');
+  console.log('Package checks passed: exact tarball integrity, exports, syntax, terminal runtime dependencies, launcher lock dependency, and no local state/build paths.');
 } finally { rmSync(home, { recursive: true, force: true }); }
