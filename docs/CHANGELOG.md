@@ -8,6 +8,14 @@ Per-release notes live in [`docs/releases/`](releases/); the entries below summa
 
 ## [Unreleased]
 
+### Added
+
+- `/provider custom` manages persistent self-hosted and private services using Chat Completions, Responses or Anthropic Messages. Model discovery can prefill context and output budgets, manual overrides survive refresh, and the editor tests a streamed synthetic tool round trip. Saved services appear by name in `/provider` and switch directly to a configured model; Custom remains the add/edit entry. Keys remain in the shared credential store. See [Custom model providers](custom-providers.md) for the text-only scope and protocol limits.
+
+### Fixed
+
+- Context occupancy in the footer falls back to recorded prompt usage when live telemetry is missing or fails, including for Custom providers. Unknown usage still displays `--`.
+
 ## [0.7.32] - 2026-09-25
 
 ### Added

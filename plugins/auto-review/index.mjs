@@ -127,7 +127,7 @@ export function apply(ctx, config) {
     // Jev answers the same question far faster and cheaper than the reviewer model.
     // It returns undefined when it is unavailable, unsure or failing, which leaves
     // the reviewer path below untouched.
-    const jev = ctx.get('jev');
+    const jev = target.provider.startsWith('custom-') ? undefined : ctx.get('jev');
     if (jev) {
       let verdict;
       try {

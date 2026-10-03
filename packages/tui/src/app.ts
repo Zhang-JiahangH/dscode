@@ -1,3 +1,4 @@
+import { CustomProviderPanel, type CustomClient, type CustomProfile } from './custom-provider-panel.ts'
 /**
  * The Ink terminal app: the DSCODE snowflake welcome header, the live
  * transcript, the todo panel, the streaming line, the approval bar, the model
@@ -501,6 +502,7 @@ export interface AppProps {
   /** Delete one session subtree; resolves with the outcome line. */
   deleteSession: (id: string) => Promise<string>
   /** Load provider/settings/credential facts for the optional /model provider stage. */
+  dscodeCustom?: CustomClient
   loadModelProviders?: () => Promise<ProviderSettingsDirectory>
   /** Subscribe to Harness credential/settings/adapter invalidations while /model is open. */
   subscribeModelProviders?: (listener: () => void) => () => void
@@ -2658,7 +2660,7 @@ function ProviderPanel({ directory, error, authorizations, authorizationError, o
     // the old split — Enter for the key alone, Tab for the deep menu — hid
     // the configuration surface behind an undiscoverable chord.
     if (key.return) {
-      if (target.settingsNs.length === 0) {
+      if (target.settingsNs.length === 0 && !target.provider.startsWith('custom-')) {
         setActionError(t('panel.provider.notManaged'))
       } else {
         onConfigure(target)
@@ -3060,21 +3062,35 @@ export interface DscodeGrokSnapshot {
   subscription?: { tier?: string; usedPercent?: number; periodEnd?: string }
 }
 
-export function DscodeProviderPanel({ current, load, choose, back, grokStatus }) {
+export function DscodeProviderPanel({ current, load, loadCustom, choose, back, grokStatus }: {
+  current: string; load: () => Promise<ProviderSettingsDirectory>; loadCustom?: CustomClient['list']
+  choose: (provider: string) => void; back: () => void; grokStatus?: () => string
+}) {
   const [directory, setDirectory] = useState<ProviderSettingsDirectory | undefined>(void 0);
   const [failed, setFailed] = useState(false);
-  const [cursor, setCursor] = useState(() => Math.max(0, DSCODE_PROVIDERS.findIndex(provider => provider.id === current)));
+  const [custom, setCustom] = useState<CustomProfile[]>([]);
+  const [customFailed, setCustomFailed] = useState(false);
+  const moved = useRef(false);
+  const [cursor, setCursor] = useState(() => current.startsWith('custom-') ? DSCODE_PROVIDERS.length : Math.max(0, DSCODE_PROVIDERS.findIndex(provider => provider.id === current)));
   useEffect(() => {
     let active = true;
     Promise.resolve().then(() => load()).then(loaded => { if (active) setDirectory(loaded); }, () => { if (active) setFailed(true); });
+    if (loadCustom) Promise.resolve().then(() => loadCustom()).then(loaded => {
+      if (!active) return;
+      setCustom(loaded.providers);
+      if (!moved.current && current.startsWith('custom-')) {
+        const index = loaded.providers.findIndex(p => p.id === current);
+        setCursor(DSCODE_PROVIDERS.length + (index < 0 ? loaded.providers.length : index));
+      }
+    }, () => { if (active) setCustomFailed(true); });
     return () => { active = false; };
   }, []);
   useStableInput((input, key) => {
-    const count = DSCODE_PROVIDERS.length;
+    const count = DSCODE_PROVIDERS.length + custom.length + 1;
     if (key.escape || key.ctrl && input === "c" || input === "q") { back(); return; }
-    if (key.upArrow || input === "k") { setCursor(index => (index + count - 1) % count); return; }
-    if (key.downArrow || input === "j") { setCursor(index => (index + 1) % count); return; }
-    if (key.return) { back(); choose(DSCODE_PROVIDERS[cursor].id); }
+    if (key.upArrow || input === "k") { moved.current = true; setCursor(index => (index + count - 1) % count); return; }
+    if (key.downArrow || input === "j") { moved.current = true; setCursor(index => (index + 1) % count); return; }
+    if (key.return) { back(); choose(DSCODE_PROVIDERS[cursor]?.id ?? custom[cursor - DSCODE_PROVIDERS.length]?.id ?? 'custom'); }
   });
   const status = provider => {
     if (provider.id === "grok") return grokStatus?.() ?? "grok login not detected";
@@ -3096,6 +3112,9 @@ export function DscodeProviderPanel({ current, load, choose, back, grokStatus })
     createElement(Text, { dimColor: true, wrap: "truncate-end" }, "The next step uses the chosen provider; /model picks among its models."),
     ...DSCODE_PROVIDERS.map((provider, index) => createElement(Text, { key: provider.id, bold: index === cursor, wrap: "truncate-end" },
       (index === cursor ? "› " : "  ") + (provider.id === current ? "● " : "○ ") + provider.name.padEnd(11) + provider.id + " · " + status(provider))),
+    ...custom.map((provider, index) => createElement(Text, { key: provider.id, bold: cursor === DSCODE_PROVIDERS.length + index, wrap: 'truncate-end' },
+      (cursor === DSCODE_PROVIDERS.length + index ? '› ' : '  ') + (provider.id === current ? '● ' : '○ ') + provider.name + ' · ' + provider.models.filter(m => m.contextWindow).length + ' model(s) · ' + (provider.credentialStatus ?? 'Custom'))),
+    createElement(Text, { bold: cursor === DSCODE_PROVIDERS.length + custom.length, wrap: 'truncate-end' }, (cursor === DSCODE_PROVIDERS.length + custom.length ? "› " : "  ") + "Custom · add / edit model services" + (customFailed ? ' · could not load saved services' : '')),
     createElement(Text, { dimColor: true }, "↑↓ choose · Enter switch · Esc cancel"));
 }
 
@@ -6466,6 +6485,7 @@ export function App(props: AppProps): ReactElement {
     | { kind: 'dscode-key'; provider: string; then?: () => void }
     | { kind: 'dscode-grok' }
     | { kind: 'dscode-provider' }
+    | { kind: 'dscode-custom'; id?: string }
     | { kind: 'dscode-compaction'; row: ModelRow; effortId: string | undefined; preview: DscodeCompactionPreview }
     | { kind: 'dscode-openrouter' }
     | { kind: 'dscode-management-key'; optional?: boolean; then?: () => void }
@@ -7117,6 +7137,20 @@ export function App(props: AppProps): ReactElement {
   // dscode: a switch declares the route, asks for a missing key (then resumes),
   // and lands on the counterpart model.
   const dscodeSwitchProvider = (provider: string): void => {
+    if (provider === 'custom') {
+      setProviderAction({ kind: 'dscode-custom' }); setModelOpen(true); return
+    }
+    if (provider.startsWith('custom-')) {
+      void props.loadModels().then(models => {
+        const pick = dscodePickModel(models.rows, provider, modelLabel, effortLabel)
+        if (pick) dscodeRequestModel(pick.row, pick.effort)
+        else {
+          setProviderAction({ kind: 'dscode-custom', id: provider }); setModelOpen(true)
+          notify('Configure a model and its context window before switching', 'warning')
+        }
+      }).catch(() => notify('Could not load the custom model', 'error'))
+      return
+    }
     const spec = dscodeProviderSpec(provider)
     if (props.loadModelProviders === undefined) { notify(t('notice.providerUnavailable'), 'warning'); return }
     Promise.resolve().then(async () => {
@@ -7214,10 +7248,24 @@ export function App(props: AppProps): ReactElement {
           else closeModelSurface()
         },
       })
+    } else if (providerAction?.kind === 'dscode-custom' && props.dscodeCustom !== undefined) {
+      modelSurface = createElement(CustomProviderPanel, {
+        client: props.dscodeCustom, initialId: providerAction.id,
+        back: closeModelSurface,
+        select: (provider: string, model: string) => {
+          reloadModelSurfaces()
+          void props.loadModels().then(directory => {
+            const row = directory.rows.find(row => row.provider === provider && row.model === model)
+            if (row) dscodeRequestModel(row, undefined)
+            else notify('Custom model is not available; check its context setting', 'error')
+          }).catch(() => notify('Could not load the custom model', 'error'))
+        },
+      })
     } else if (providerAction?.kind === 'dscode-provider') {
       modelSurface = createElement(DscodeProviderPanel, {
         current: dscodeProviderOfLabel(modelLabel),
         load: props.loadModelProviders!,
+        loadCustom: props.dscodeCustom === undefined ? undefined : () => props.dscodeCustom!.list(),
         choose: dscodeSwitchProvider,
         grokStatus: () => grokStatusText(props.dscodeGrokStatus?.() ?? { status: { kind: "missing" } }),
         back: closeModelSurface,
@@ -7347,7 +7395,7 @@ export function App(props: AppProps): ReactElement {
             notify(t('notice.providerUnavailable'), 'warning')
             return
           }
-          setProviderAction({ kind: 'configure', target })
+          setProviderAction(target.provider.startsWith('custom-') ? { kind: 'dscode-custom', id: target.provider } : { kind: 'configure', target })
         },
         onUnset: (target: ProviderTargetView) => {
           if (props.unsetModelProviderCredential === undefined) {
@@ -7776,6 +7824,7 @@ export function App(props: AppProps): ReactElement {
           setProviderOpen(false)
           setEffortFor(undefined)
           const target = provider ?? dscodeProviderOfLabel(modelLabel)
+          if (target === 'custom' || target.startsWith('custom-')) { setProviderAction({ kind: 'dscode-custom', ...(target === 'custom' ? {} : { id: target }) }); setModelOpen(true); return }
           const spec = dscodeProviderSpec(target) as { name: string; login?: string } | undefined
           if (spec?.login !== undefined) { notify(t('notice.providerNeedsLogin', { name: spec.name, command: spec.login }), 'warning'); return }
           setProviderAction(target === 'grok' ? { kind: 'dscode-grok' } : { kind: 'dscode-key', provider: target })

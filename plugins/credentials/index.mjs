@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { LocalCredentialProvider } from '@deepseek-ai/dsh-credentials-local';
 import { Context, Service } from '@deepseek-ai/cordis';
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment';
+import { isCustomKey } from '../custom/config.mjs';
 import { PROVIDERS } from '../providers/catalog.mjs';
 import { GROK_TOKEN_REF, grokAuthState } from '../grok/auth.mjs';
 
@@ -39,7 +40,7 @@ export default class DscodeCredentials extends LocalCredentialProvider {
       const state = grokAuthState();
       return state.kind === 'ready' ? { value: state.credential.token, source: 'file' } : undefined;
     }
-    if (SHARED.has(ref)) {
+    if (SHARED.has(ref) || isCustomKey(ref)) {
       const stored = await this.shared.resolve(ref);
       if (stored?.source === 'env' || stored?.source === 'file') return stored;
     }
@@ -53,7 +54,7 @@ export default class DscodeCredentials extends LocalCredentialProvider {
     if (LOGINS.has(ref)) {
       return (await this.shared.resolve(ref))?.value ? { configured: true, source: 'account', writable: false } : { configured: false, writable: false };
     }
-    if (SHARED.has(ref)) {
+    if (SHARED.has(ref) || isCustomKey(ref)) {
       const facts = await this.shared.describe(ref);
       if (facts.source === 'env' || facts.source === 'file') return facts;
     }
@@ -62,11 +63,11 @@ export default class DscodeCredentials extends LocalCredentialProvider {
   set(ref, value) {
     // The CLI file is not a DSCODE store: saving here would go somewhere nothing reads.
     if (ref === GROK_TOKEN_REF) throw new Error('GROK_CLI_TOKEN comes from ~/.grok/auth.json; run grok login instead');
-    return SHARED.has(ref) ? this.shared.set(ref, value) : super.set(ref, value);
+    return (SHARED.has(ref) || isCustomKey(ref)) ? this.shared.set(ref, value) : super.set(ref, value);
   }
   async unset(ref) {
     // Explicit removal must not uncover a previously configured legacy key.
-    if (SHARED.has(ref)) await this.shared.unset(ref);
+    if (SHARED.has(ref) || isCustomKey(ref)) await this.shared.unset(ref);
     await super.unset(ref);
   }
 }

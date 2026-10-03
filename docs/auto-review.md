@@ -34,7 +34,7 @@ An action JSON over 12,000 characters, all direct user text over 8,000 character
 
 ## Model and cost
 
-By default it uses the provider/model the agent actually requested most recently, but with an independent, condensed review context. `config/harness.local.yml` can point at another model whose credentials are already configured:
+When the reviewer route is a [Custom provider](custom-providers.md), it skips the cloud Jev shortcut. By default it uses the provider/model the agent actually requested most recently, but with an independent, condensed review context. `config/harness.local.yml` can point at another model whose credentials are already configured:
 
 ```yaml
 - id: dscode-auto-review

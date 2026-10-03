@@ -97,6 +97,7 @@ export class RoutedSearchProvider {
     const { openrouter, deepseek: lookup, exa, currentProvider, hasKey } = this.routes;
     const deepseek = lookup();
     const route = currentProvider();
+    if (route?.startsWith('custom-')) throw new WebError('Web search is not configured for Custom. Configure a separate search provider explicitly.', 'WEB_PROVIDER_CREDENTIAL_MISSING');
     if (route === 'openrouter') return openrouter;
     if (route === 'opencode-go' && exa) return exa;
     if (route === 'deepseek-official' && deepseek) return deepseek;

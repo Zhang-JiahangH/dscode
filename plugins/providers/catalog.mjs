@@ -49,7 +49,7 @@ export async function migrateOpenRouterProfile(settings) {
 }
 
 export function providerSpec(id) {
-  return PROVIDERS.find(provider => provider.id === id);
+  return PROVIDERS.find(provider => provider.id === id) ?? (typeof id === 'string' && /^custom-[a-zA-Z0-9-]+$/.test(id) ? { id, name: 'Custom', aliases: [id] } : undefined);
 }
 
 /**
@@ -60,6 +60,7 @@ export function providerSpec(id) {
 export function providerArgument(raw) {
   const value = String(raw ?? '').trim().toLowerCase();
   if (value === '') return undefined;
+  if (value === 'custom') return 'custom';
   return PROVIDERS.find(provider => provider.aliases.includes(value))?.id ?? null;
 }
 

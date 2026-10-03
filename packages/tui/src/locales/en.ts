@@ -228,7 +228,7 @@ export const en = {
   'cmd.dscode.provider': 'switch between DeepSeek and OpenRouter',
   'notice.loginUsage': 'Use /login, /login deepseek or /login openrouter, then paste the key in the private input.',
   'notice.loginBusy': 'Stop the running turn before /login.',
-  'notice.providerUsage': 'Usage: /provider [deepseek|openrouter]',
+  'notice.providerUsage': 'Usage: /provider [deepseek|openrouter|grok|opencode-go|custom]',
   'notice.providerBusy': 'Stop the running turn before /provider.',
   'notice.providerUnavailableSuffix': ' is unavailable in this profile',
   'notice.providerUnverified': 'could not confirm the {name} API key; requests may fail until /login {provider} succeeds',

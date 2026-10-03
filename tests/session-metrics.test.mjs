@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { estimateCost, priceVersionFor } from '../plugins/session-metrics/pricing.mjs';
 import { RETRY_MS, openRouterRates, parseOpenRouterModels, refreshOpenRouterModels, setOpenRouterModels } from '../plugins/openrouter/models.mjs';
-import { summarize, formatFooter, footerFor, displayWidth, setMetricSource } from '../plugins/session-metrics/view.mjs';
+import { summarize, formatFooter, footerFor, footerFiguresFor, displayWidth, setMetricSource } from '../plugins/session-metrics/view.mjs';
 import { apply } from '../plugins/session-metrics/index.mjs';
 import { appendMetric, ledgerPath, readMetrics } from '../plugins/session-metrics/store.mjs';
 import { chargeTo } from '../plugins/session-metrics/attribution.mjs';
@@ -257,6 +257,22 @@ test('the provider decides the money slot and the peak marker', () => {
   assert.match(line(80, 'deepseek-official'), /\$0\.00 (?:🔥|❄️)/, 'the official route marks the billing window');
   assert.match(line(80, 'openrouter'), /^ 43% ctx · \$0\.00 · {2}90\.0% cache$/, 'another route keeps the plain spend');
   assert.doesNotMatch(line(80, 'openrouter'), /🔥|❄️/);
+});
+
+test('custom context survives missing or failing live telemetry using recorded prompt usage', t => {
+  t.after(() => setMetricSource(undefined));
+  const stats = { contextWindow: 262144, lastPromptTokens: 21847 };
+  const context = () => footerFiguresFor('custom-context-test', stats, 'custom-studio').context;
+  setMetricSource(undefined);
+  assert.match(context(), /8% ctx/);
+  setMetricSource(() => { throw Error('live agent unavailable'); });
+  assert.match(context(), /8% ctx/);
+  setMetricSource(() => ({ events: [], used: NaN, capacity: 0 }));
+  assert.match(context(), /8% ctx/);
+  setMetricSource(() => ({ events: [], used: 23309, capacity: 262144 }));
+  assert.match(context(), /9% ctx/, 'live next-request pressure remains preferred');
+  setMetricSource(undefined);
+  assert.match(footerFiguresFor('custom-context-test', { contextWindow: 262144, lastPromptTokens: 0 }, 'custom-studio').context, /-- ctx/, 'no sample is not a measured zero');
 });
 test('collector smooths completed API usage without estimating streams or counting aborted calls', async t => {
   const home = mkdtempSync(join(tmpdir(), 'dscode-live-rate-'));

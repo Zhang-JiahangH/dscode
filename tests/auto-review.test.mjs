@@ -45,6 +45,15 @@ function fixture({ decision = 'allow', timeout = false, budget = 2, policy = 'as
   return { records, hooks, commands, agent, events, requests, notices, pending, answer, setMode: value => { permission = value; }, human: () => human };
 }
 
+test('a custom reviewer route skips cloud Jev and reviews with the selected model', async () => {
+  let cloudCalls = 0;
+  const f = fixture({ jev: { approval: async () => { cloudCalls++; return undefined; } } });
+  f.agent.session.requestHeader = () => ({ config: { provider: 'custom-studio', model: 'qwen' } });
+  assert.equal(await f.answer((await f.pending()).req), 'allowed-once');
+  assert.equal(cloudCalls, 0);
+  assert.equal(f.requests[0].provider, 'custom-studio');
+});
+
 test('MCP gate trusts only exact reviewed Chrome read methods', () => {
   assert.equal(needsMcpApproval('bash'), false);
   assert.equal(needsMcpApproval('mcp__chrome__take_snapshot'), false);

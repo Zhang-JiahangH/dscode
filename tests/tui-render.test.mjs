@@ -143,7 +143,7 @@ test('the status line names the session on row 1 and right-aligns finances on ro
     assert.match(row1, /Migrating the TUI · deepseek-flash @ ultra · context/, row1);
     assert.ok(row1.trimEnd().endsWith('(shift+tab to cycle) · accept-edits'), row1);
     assert.equal(visibleColumns(row1), 120, 'row 1 fills the terminal');
-    assert.match(row2, /-- tps · {5}-- tps avg · {3}-- ctx\s{3,}\$0\.00 (?:🔥|❄️) · {5}-- cache$/, row2);
+    assert.match(row2, /-- tps · {5}-- tps avg · {2}43% ctx\s{3,}\$0\.00 (?:🔥|❄️) · {5}-- cache$/, row2);
     assert.equal(visibleColumns(row2), 120, 'the financial group reaches the right edge');
   } finally {
     ui.close();

@@ -238,7 +238,10 @@ const footerCache = new WeakMap();
 export function footerFor(id, stats, columns, provider = 'deepseek-official', locale = 'en', format = formatFooter) {
   const limit = parseBudget(process.env.DSCODE_SESSION_BUDGET_USD);
   try {
-    const data = id ? source?.(id) : undefined;
+    // Live estimation can be unavailable while a Host/agent is reconnecting.
+    // Keep the durable prompt reading visible instead of losing all telemetry.
+    let data;
+    try { data = id ? source?.(id) : undefined; } catch { /* use the TUI's durable projection */ }
     const ledger = id && process.env.DSH_HOME ? readMetrics(process.env.DSH_HOME, id) : { rows: [], corrupt: false };
     const events = data?.events ?? [];
     // Identity alone is not enough: a session event list may be appended to in place.
@@ -246,8 +249,9 @@ export function footerFor(id, stats, columns, provider = 'deepseek-official', lo
     const tail = events.at(-1)?.time;
     const fresh = hit !== undefined && hit.key === ledger.rows && hit.length === events.length && hit.tail === tail;
     const summary = fresh ? hit.summary : summarize(ledger.rows, events, ledger.corrupt);
-    const used = data?.used;
-    const capacity = data?.capacity ?? stats.contextWindow;
+    const used = Number.isFinite(data?.used) && data.used >= 0 ? data.used
+      : Number.isFinite(stats.lastPromptTokens) && stats.lastPromptTokens > 0 ? stats.lastPromptTokens : undefined;
+    const capacity = Number.isFinite(data?.capacity) && data.capacity > 0 ? data.capacity : stats.contextWindow;
     const average = fresh ? hit.average : sessionAverageTps(events);
     if (events.length > 0 && !fresh) footerCache.set(events, { key: ledger.rows, length: events.length, tail, summary, average });
     // The budget comes from the environment for this process only: it is a

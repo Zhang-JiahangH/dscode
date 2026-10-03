@@ -1,3 +1,4 @@
+import { getCustomProviders } from '../../../plugins/custom/index.mjs'
 /**
  * @deepseek-ai/dsh-code — the interactive terminal driver. The bundle patch
  * rides over dsh-base without Host, HTTP, or browser plugins; this runner
@@ -2339,6 +2340,7 @@ async function run(ctx: Context, startup: TuiStartup, io: TuiIo): Promise<void> 
       dscodeManagementKeyStatus: () => dscodeManagementKeyStatus(ctx),
       dscodeSaveManagementKey: (key: string) => dscodeSaveManagementKey(ctx, key),
       dscodeLoadOpenRouterAccount: () => dscodeLoadOpenRouterAccountFor(ctx),
+      dscodeCustom: getCustomProviders(ctx),
       loadModelProviders: () => loadProviderSettings(ctx),
       subscribeModelProviders: listener => subscribeProviderSettings(ctx, listener),
       saveModelProviderCredential: (target, key) => saveProviderCredential(ctx, target, key),

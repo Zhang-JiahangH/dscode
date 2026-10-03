@@ -230,7 +230,7 @@ export const zh: MessageCatalog = {
   'cmd.dscode.provider': '在 DeepSeek 与 OpenRouter 之间切换',
   'notice.loginUsage': '用法：/login、/login deepseek 或 /login openrouter，然后在私有输入框中粘贴密钥。',
   'notice.loginBusy': '请先停止正在运行的回合，再执行 /login。',
-  'notice.providerUsage': '用法：/provider [deepseek|openrouter]',
+  'notice.providerUsage': '用法：/provider [deepseek|openrouter|grok|opencode-go|custom]',
   'notice.providerBusy': '请先停止正在运行的回合，再执行 /provider。',
   'notice.providerUnavailableSuffix': ' 在当前 profile 中不可用',
   'notice.providerUnverified': '无法确认 {name} 的 API key；在 /login {provider} 成功前请求可能失败',
