@@ -99,6 +99,12 @@ when no regular targets exist. The disposable Chrome fixture now waits for its
 original page target at the debugging endpoint before establishing MCP; it still
 asserts the actual tool inventory and preserves the original tab on disconnect.
 
+Remote diagnostics at 6bd8684 exposed `bwrap: pivot_root: Operation not permitted`.
+The disposable e2e container now also disables its outer seccomp profile, since
+Docker profiles can deny that syscall (see [Docker's seccomp documentation](https://docs.docker.com/engine/security/seccomp/)).
+This setting applies only to the test container, without host mounts or Docker
+socket access; DSCODE's inner sandbox and behavioral checks remain enabled.
+
 ## Distribution readiness review — 2026-10-07
 
 The current working tree supports a controlled macOS Apple Silicon Desktop

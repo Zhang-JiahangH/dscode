@@ -78,9 +78,9 @@ if (built !== 0) {
 
 // -t: the probes exercise terminal paths, so the container gets a TTY like a real host.
 // bubblewrap must create mount namespaces inside this disposable container to
-// exercise real source scripts; Docker's default AppArmor profile denies mounts
-// even with that capability. No host directories or Docker socket are mounted.
-const container = await run('docker', ['run', '--rm', '--cap-add', 'SYS_ADMIN', '--security-opt', 'apparmor=unconfined', '-t', image, 'node', 'scripts/e2e.mjs', '--inside', ...(args.has('--no-hub') ? ['--no-hub'] : [])]);
+// exercise real source scripts; outer AppArmor/seccomp profiles can deny mounts
+// and pivot_root. No host directories or Docker socket are mounted.
+const container = await run('docker', ['run', '--rm', '--cap-add', 'SYS_ADMIN', '--security-opt', 'apparmor=unconfined', '--security-opt', 'seccomp=unconfined', '-t', image, 'node', 'scripts/e2e.mjs', '--inside', ...(args.has('--no-hub') ? ['--no-hub'] : [])]);
 if (container !== 0) {
   console.error(`[e2e] FAILED: the container exited ${container}`);
   process.exit(container);
