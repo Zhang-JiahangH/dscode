@@ -47,6 +47,7 @@ async function command(args, succeeds = true) {
   return output;
 }
 const customCancellationPhases = [], browserStopPhases = [], browserModeSettingsPhases = [], commandInputPhases = [], browserResumePhases = [], browserStatusPhases = [];
+const shellPatchPhases = [];
 let legacyConfigurationBaseline = false, installedBrowserAccessVerified = false, installedBrowserTabRefreshVerified = false;
 async function boot(phase, version) {
   for (const file of ['install-probe-result.json', 'install-probe-failure.txt']) rmSync(join(home, file), { force: true });
@@ -66,6 +67,8 @@ async function boot(phase, version) {
     if (phase !== 'initialize') {
       const result = json(join(home, 'install-probe-result.json'));
       assert.equal(result.phase, phase);
+      assert.equal(result.shellPatchVerified, ['upgraded', 'rejected', 'reinstalled'].includes(phase));
+      if (result.shellPatchVerified) shellPatchPhases.push(phase);
       const expectedCancellation = phase !== 'removed' && !(legacyConfigurationBaseline && phase === 'installed');
       assert.equal(result.customCancellationVerified, expectedCancellation);
       if (result.customCancellationVerified) customCancellationPhases.push(phase);
@@ -111,7 +114,7 @@ try {
   assert.equal(initialPackage.runtime, runtime);
   assert.equal(hash(initial), initialPackage.sha256, 'Baseline package differs from its receipt');
   const implementationEntries = ['plugins/custom/config.mjs', 'plugins/browser/config.mjs', 'plugins/browser/files.mjs',
-    'plugins/computer-use/desktop-host.mjs', 'plugins/memory/index.mjs', 'plugins/dscode/index.mjs',
+    'plugins/computer-use/desktop-host.mjs', 'plugins/memory/index.mjs', 'plugins/dscode/index.mjs', 'vendor/bash/index.js', 'vendor/terminal/index.js',
     'plugins/code-review/index.mjs', 'plugins/session-bridge/index.mjs', 'plugins/tui-tools/index.mjs',
     'plugins/browser/index.mjs', 'plugins/browser/connection.mjs', 'plugins/browser/preview.mjs',
     'plugins/browser/mcp-entry.mjs', 'plugins/browser/screenshots.mjs', 'plugins/browser/presentation.mjs',
@@ -218,7 +221,7 @@ try {
     installedBrowserTabRefreshVerified,
     installedBrowserAccessVerified, installedBrowserVersions, sessionResumedAfterUpgrade: true,
     userPatchPreserved: true, sessionFilesPreservedOnRemove: true, reinstallResumesSession: true, noSecondCoreRuntime: true,
-    nativeCommunicationTools: true, namespacedDiagnostics: true, bundledGuides: true,
+    nativeCommunicationTools: true, namespacedDiagnostics: true, bundledGuides: true, shellPatchPhases,
     deferredMailboxPreserved: true, deferredResumeDoesNotWake: true,
     idempotencySurvivesUpgradeAndReinstall: true, singleDeliveryAfterReinstall: true, communicationWithdrawnOnRemove: true,
     providerAccountsPreserved: true, accountRpcWithdrawnOnRemove: true,

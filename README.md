@@ -119,6 +119,8 @@ An experimental combined Desktop package adds the DSCODE preset, custom-model an
 <details>
 <summary><b>Other install paths, upgrades and rollback</b></summary>
 
+The Desktop package includes DSCODE's unified-diff `apply_patch` command for its persistent, child and fresh shells. It leaves the Host PATH and native Standard shell providers unchanged.
+
 **From source**
 
 ```sh

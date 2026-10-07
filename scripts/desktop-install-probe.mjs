@@ -65,6 +65,7 @@ async function run(ctx) {
   let customCancellationVerified = false, browserStopVerified = false, installedBrowserAccessVerified = false;
   let browserConfigurationVerified = false, browserModeSettingsVerified = false, browserTabRefreshVerified = false;
   let commandInputsVerified = false, browserResumeVerified = false, browserStatusVerified = false;
+  let shellPatchVerified = false;
   if (phase === 'removed') {
     assert.equal((await browserRpc({ action: 'tabs', sessionId: 'desktop-install-preserved' })).status, 404);
     assert.equal(ctx.get('dscodeCustom'), undefined);
@@ -202,7 +203,20 @@ async function run(ctx) {
     const ended = new Map();
     const settlement = id => { if (!ended.has(id)) ended.set(id, Promise.withResolvers()); return ended.get(id); };
     coordinator.ctx.on('subagent/end', event => settlement(event.id).resolve());
-    ctx.on('approval/request', (request, next) => ['subagent', 'bash'].includes(request.toolName) ? Promise.resolve('allowed-once') : next(), { prepend: true });
+    ctx.on('approval/request', (request, next) => ['subagent', 'bash', 'shell_retry'].includes(request.toolName) ? Promise.resolve('allowed-once') : next(), { prepend: true });
+    if (['upgraded', 'rejected', 'reinstalled'].includes(phase)) {
+      const hostPath = process.env.PATH;
+      const file = join(agent.session.header.cwd, 'desktop-installed-patch.txt');
+      writeFileSync(file, 'before\n');
+      const diff = 'diff --git a/desktop-installed-patch.txt b/desktop-installed-patch.txt\n--- a/desktop-installed-patch.txt\n+++ b/desktop-installed-patch.txt\n@@ -1 +1 @@\n-before\n+after\n';
+      const applied = await control('bash', { command: `apply_patch <<'PATCH'\n${diff}PATCH` }, agent);
+      assert.equal(readFileSync(file, 'utf8'), 'after\n', JSON.stringify(applied));
+      const checked = await control('shell_retry', { command: `apply_patch --check --reverse <<'PATCH'\n${diff}PATCH`, workdir: agent.session.header.cwd, description: 'Check the installed patch helper without writing' }, agent);
+      assert.equal(checked.value?.exitCode, 0, JSON.stringify(checked));
+      assert.equal(readFileSync(file, 'utf8'), 'after\n');
+      assert.equal(process.env.PATH, hostPath);
+      shellPatchVerified = true;
+    }
     const savedChild = join(process.env.DSH_HOME, 'delegation-install.json');
     let childState, observed = false;
     try {
@@ -450,7 +464,7 @@ async function run(ctx) {
     await verifyBrowserAccess(join(process.env.DSH_HOME, 'profiles/desktop/node_modules', process.env.DSCODE_INSTALL_PACKAGE));
     installedBrowserAccessVerified = true;
   }
-  writeFileSync(join(process.env.DSH_HOME, 'install-probe-result.json'), JSON.stringify({ phase, version: process.env.DSCODE_INSTALL_VERSION, nativeHost: true, customCancellationVerified, browserStopVerified, installedBrowserAccessVerified, browserConfigurationVerified, browserModeSettingsVerified, browserTabRefreshVerified, commandInputsVerified, browserResumeVerified, browserStatusVerified }));
+  writeFileSync(join(process.env.DSH_HOME, 'install-probe-result.json'), JSON.stringify({ phase, version: process.env.DSCODE_INSTALL_VERSION, nativeHost: true, customCancellationVerified, browserStopVerified, installedBrowserAccessVerified, browserConfigurationVerified, browserModeSettingsVerified, browserTabRefreshVerified, commandInputsVerified, browserResumeVerified, browserStatusVerified, shellPatchVerified }));
   console.log('DESKTOP_INSTALL_PROBE_PASSED ' + phase);
 }
 

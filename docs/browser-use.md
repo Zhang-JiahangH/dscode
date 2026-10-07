@@ -676,6 +676,13 @@ reporting completion. No dependency installation scripts run during packaging.
 Including a platform's binary does not establish Desktop qualification on that
 platform; the tested application remains macOS Apple Silicon.
 
+The package also ships DSCODE's `apply_patch` helper for standard unified diffs.
+DSCODE's persistent shell, child shells and fresh `shell_retry` calls resolve this
+helper before any same-named command on the inherited PATH. `apply_patch --check`
+validates without writing. This setup leaves the Desktop Host's global PATH and
+native Standard shell providers unchanged; shell sandbox and approval rules still
+apply.
+
 Open the official application once to initialize its Desktop profile, then
 fully quit it. Use the application's bundled command, adjusting the application
 path and replacing the package placeholder with the printed tarball path:

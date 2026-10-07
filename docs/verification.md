@@ -28,6 +28,42 @@ The GitHub Actions workflow runs the gate on macOS with Node 22.19 and 24. Addin
 
 `npm run verify:hub` also runs `scripts/verify-installed-tui.mjs` against the isolated native installation. It imports the bundle's public `/startup` and `/tui` entries and checks their plugin exports, resolving their transitive dependencies from the installed profile. A `--dump-config` success alone does not exercise those imports. The verification receipt records `terminalImports: true`, which publication requires alongside the existing installation and lifecycle checks. This import check does not render the interactive terminal.
 
+## Desktop shell helper packaging — 2026-10-07
+
+The combined Desktop preset previously told the agent to use DSCODE's unified-diff
+`apply_patch`, but omitted that command from the package. A native Host probe
+reproduced a failed edit when a different parent's `apply_patch` was found on PATH;
+the file retained its original contents and the command demanded another patch
+format. This affected Desktop packaging; the terminal bundle already supplied
+its helper.
+
+Desktop now includes the executable and prepends its directory only in the copied
+persistent-terminal and fresh-shell providers' child environments. Child agents
+use the same packaged helper. The Host environment is not mutated. Build-time
+replacement requires the expected upstream anchors and changes only staged copies.
+The source runtime remains unchanged.
+
+Independent native Host probes passed for 0.2.0-rc.2 and 0.2.1-alpha.1 after an
+npm pack/unpack round trip. They exercised an actual persistent-shell edit, a
+nonwriting fresh-shell check, both child creation modes, unchanged Host PATH and
+an actual native Standard shell without the DSCODE helper directory.
+
+The full local gate passed 1,048 unit/component cases, 80.78% first-party line
+coverage, both typechecks, native integration, package verification and 63 evaluator
+cases. A regression case places an incompatible executable first on the inherited
+PATH and verifies the Desktop environment still applies the intended patch without
+modifying its parent environment. The official macOS Apple Silicon Desktop
+0.2.0-rc.2 lifecycle passed all six boots; actual patch writes and nonwriting
+`--check --reverse` passed after upgrade, rejected incompatible upgrade and
+reinstallation. The existing real Chrome and persisted-state lifecycle checks
+also passed. Its package SHA-256 is
+`cebeaf4b302558046fc84939e2ccf807bbed1322c388c950c5481816577d9861`.
+
+Evidence is retained under `artifacts/local/desktop-patch-*` and
+`artifacts/local/desktop-install.json`. This is still an unpublished Desktop
+qualification package; live inference and other operating-system Desktop installs
+remain unqualified.
+
 ## First remote CI results and fixture corrections — 2026-10-07
 
 The Browser/Desktop source was submitted as

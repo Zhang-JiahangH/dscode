@@ -12,6 +12,7 @@ export function apply(ctx) {
 }
 
 async function run(ctx) {
+  const hostPath = process.env.PATH;
   await ctx.get('loader').await();
   const preset = await ctx.agentPresets.resolve('dscode');
   assert.equal(preset.broken, undefined, preset.broken);
@@ -48,13 +49,15 @@ async function run(ctx) {
           action = [
             ['bash', { command: "export DSCODE_FIXTURE_STATE=retained; printf 'first!\\n'" }],
             ['bash', { command: "printf 'persistent=%s\\n' \"$DSCODE_FIXTURE_STATE\"" }],
-            ['shell_retry', { command: "printf 'fresh=%s\\n' \"${DSCODE_FIXTURE_STATE-unset}\"", description: 'Check isolated fresh shell state', workdir: process.cwd() }],
+            ['shell_retry', { command: "printf 'fresh=%s\\nhelper=%s\\n' \"${DSCODE_FIXTURE_STATE-unset}\" \"$(command -v apply_patch)\"", description: 'Check isolated fresh shell state', workdir: process.cwd() }],
             ['subagent', { name: 'childone', description: 'Check child shell isolation', prompt: 'Execute the scripted child shell check.', reasoning_effort: 'low', run_in_background: false }],
             ['subagent_fork', { name: 'childtwo', description: 'Check fork shell isolation', prompt: 'Execute the scripted fork shell check.', reasoning_effort: 'high', run_in_background: false }],
+            ['bash', { command: "printf 'before\\n' > desktop-patch-fixture.txt; apply_patch <<'PATCH'\ndiff --git a/desktop-patch-fixture.txt b/desktop-patch-fixture.txt\n--- a/desktop-patch-fixture.txt\n+++ b/desktop-patch-fixture.txt\n@@ -1 +1 @@\n-before\n+after\nPATCH" }],
+            ['shell_retry', { command: "apply_patch --check <<'PATCH'\ndiff --git a/desktop-patch-fixture.txt b/desktop-patch-fixture.txt\n--- a/desktop-patch-fixture.txt\n+++ b/desktop-patch-fixture.txt\n@@ -1 +1 @@\n-after\n+fresh\nPATCH", description: 'Validate a patch without writing it', workdir: process.cwd() }],
           ][step];
         } else {
           childRoutes.set(options.sessionId, { provider: options.provider, model: options.model, effort: options.reasoningEffort });
-          if (step === 0) action = ['bash', { command: "printf 'child=%s\\n' \"${DSCODE_FIXTURE_STATE-unset}\"" }];
+          if (step === 0) action = ['bash', { command: "printf 'child=%s\\nhelper=%s\\n' \"${DSCODE_FIXTURE_STATE-unset}\" \"$(command -v apply_patch)\"" }];
         }
       }
       if (action) assert(options.tools.some(tool => tool.name === action[0]), `Missing ${action[0]}`);
@@ -86,16 +89,32 @@ async function run(ctx) {
   assert.deepEqual(failures, [], JSON.stringify(failures));
   const text = row => row.result.content?.filter(block => block.type === 'text').map(block => block.text).join('\n') ?? '';
   const parent = results.filter(row => row.session === parentId);
-  assert.equal(parent.length, 5, JSON.stringify({ results, events: agent.session.snapshotEvents().slice(-8) }));
+  assert.equal(parent.length, 7, JSON.stringify({ results, events: agent.session.snapshotEvents().slice(-8) }));
   assert.match(text(parent[0]), /first!/);
   assert.match(text(parent[1]), /persistent=retained/);
   assert.match(text(parent[2]), /fresh=unset/);
+  assert.match(text(parent[2]), /helper=.*\/installed\/package\/bin\/apply_patch/);
+  assert.equal(readFileSync(join(process.cwd(), 'desktop-patch-fixture.txt'), 'utf8'), 'after\n', text(parent[5]));
+  assert.equal(parent[6].result.value.exitCode, 0, text(parent[6]));
+  assert.equal(process.env.PATH, hostPath, 'Desktop shell helpers must not change the Host environment');
   assert.equal(childRoutes.size, 2, JSON.stringify([...childRoutes]));
   assert.deepEqual([...childRoutes.values()].map(route => route.effort).sort(), ['high', 'low']);
   for (const route of childRoutes.values()) assert.deepEqual({ provider: route.provider, model: route.model }, { provider: 'desktop-preset-fixture', model: 'scripted' });
   const childShells = results.filter(row => row.session !== parentId && row.name === 'bash');
   assert.equal(childShells.length, 2);
-  for (const row of childShells) assert.match(text(row), /child=unset/);
+  for (const row of childShells) {
+    assert.match(text(row), /child=unset/);
+    assert.match(text(row), /helper=.*\/installed\/package\/bin\/apply_patch/);
+  }
+  const standard = await ctx.agents.create({ sessionId: 'desktop-native-standard-shell',
+    meta: { cwd: process.cwd(), agentPreset: 'standard' },
+    agentOptions: { provider: 'desktop-preset-fixture', model: 'scripted' },
+    setup: async scope => { await ctx.agentPresets.mount(scope, 'standard'); } });
+  const standardShell = await ctx.tools.execute({ name: 'bash', arguments: { command: 'printf "%s\\n" "$PATH"', description: 'Inspect native Standard shell PATH' },
+    agent: standard.agent, callId: 'standard-shell-path', signal: AbortSignal.timeout(10000) });
+  assert.equal(standardShell.isError, false, JSON.stringify(standardShell));
+  assert(!text({ result: standardShell }).includes('/installed/package/bin'), 'Native Standard inherited DSCODE shell helpers');
+  await standard.dispose();
   const status = (await ctx.commands.execute(agent, '/shell status', [], new AbortController().signal)).result;
   assert.equal(status.kind, 'success', status.text);
   const workspaces = await Promise.all(['alpha', 'beta'].map(label => ctx.agents.create({
@@ -143,6 +162,6 @@ async function run(ctx) {
   assert.deepEqual(results.filter(row => row.result.isError), [], 'All workspace tools must succeed');
   const custom = await verifyDesktopCustom(ctx);
   const browser = process.env.DSCODE_DESKTOP_BROWSER === '1' ? await verifyDesktopBrowser(ctx) : {};
-  console.log('DESKTOP_PRESET_PASSED ' + JSON.stringify({ commandInputs, persistentShell: true, freshShell: true, spawn: true, fork: true, childEffort: true, childShellIsolation: true, workspaceInstructionIsolation: true, workspaceSkillIsolation: true, workspaceHookIsolation: true, sessionStartOnce: true, workspaceDisposal: true, ...custom, ...browser, liveModelInference: false }));
+  console.log('DESKTOP_PRESET_PASSED ' + JSON.stringify({ commandInputs, persistentShell: true, freshShell: true, bundledPatchHelper: true, freshPatchCheck: true, hostPathUnchanged: true, nativeStandardShellUnchanged: true, spawn: true, fork: true, childEffort: true, childShellIsolation: true, workspaceInstructionIsolation: true, workspaceSkillIsolation: true, workspaceHookIsolation: true, sessionStartOnce: true, workspaceDisposal: true, ...custom, ...browser, liveModelInference: false }));
   ctx.get('appExit')(0);
 }

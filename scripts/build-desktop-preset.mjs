@@ -32,6 +32,8 @@ export function buildDesktopPreset(destination, runtimeDirectory) {
   mkdirSync(destination, { recursive: true });
   const nativePackages = bundleDesktopSystemAddon(destination);
   cpSync(join(root, 'plugins'), join(destination, 'plugins'), { recursive: true });
+  mkdirSync(join(destination, 'bin'), { recursive: true });
+  cpSync(join(root, 'bin/apply_patch'), join(destination, 'bin/apply_patch'));
   // Agent-facing instructions resolve the matching local guides when present.
   bundleDesktopDocs(root, destination);
   const computerUse = bundleDesktopComputerUse(destination);
@@ -56,7 +58,14 @@ export function buildDesktopPreset(destination, runtimeDirectory) {
     const target = join(destination, 'vendor', key);
     cpSync(join(source, 'lib'), target, { recursive: true });
     const before = readFileSync(join(target, 'index.js'), 'utf8');
-    writeFileSync(join(target, 'index.js'), patch ? patch(before) : before);
+    let adapted = patch ? patch(before) : before;
+    if (key === 'terminal' || key === 'bash') {
+      const anchor = key === 'terminal' ? 'const common = {' : 'const request = {';
+      const property = key === 'terminal' ? '...desktopShellEnvironment(),' : 'env: desktopShellEnvironment(),';
+      adapted = `import { desktopShellEnvironment } from '../../plugins/desktop/shell-environment.mjs';\n` +
+        replaceOnce(adapted, anchor, `${anchor}\n${property}`);
+    }
+    writeFileSync(join(target, 'index.js'), adapted);
     exports[`./${key}`] = `./vendor/${key}/index.js`;
     sources.push({ package: meta.name, version: meta.version, entrySha256: createHash('sha256').update(before).digest('hex') });
     notices.push(`${meta.name}@${meta.version}: ${meta.license}. ${JSON.stringify(meta.repository)}\nLocal changes: DSCODE shell capture/reset, named fallback shell, child names/effort/worktrees and goal round caps.\n`);
@@ -122,7 +131,7 @@ export function buildDesktopPreset(destination, runtimeDirectory) {
   writeFileSync(join(destination, 'cordis.patch.yml'), patch);
   const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
   writeFileSync(join(destination, 'package.json'), JSON.stringify({ name, version, private: true, type: 'module', license: 'MIT', exports,
-    files: ['plugins', 'docs', 'extensions', 'vendor', 'cordis.patch.yml', 'runtime-sources.json', 'THIRD_PARTY_NOTICES.md', 'README.md', 'LICENSE'],
+    files: ['plugins', 'bin', 'docs', 'extensions', 'vendor', 'cordis.patch.yml', 'runtime-sources.json', 'THIRD_PARTY_NOTICES.md', 'README.md', 'LICENSE'],
     // Script guardians are separate Node processes and do not inherit the
     // Desktop Host's runtime resolver. Declare their direct imports explicitly.
     dependencies: { ...browserDependencies, imapflow: '2.0.5', mailparser: '3.9.28', nodemailer: '10.0.10', 'cron-parser': '5.7.0', yaml: '2.9.1', zod: '4.6.5', [desktopSystemAddon]: desktopSystemAddonVersion },

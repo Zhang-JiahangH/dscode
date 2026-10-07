@@ -119,6 +119,8 @@ npm 启动器会核对已安装 bundle 与 Harness 依赖的推荐版本组合�
 <details>
 <summary><b>其他安装方式、升级与回退</b></summary>
 
+Desktop 包为 DSCODE 的持久 shell、子任务 shell 和新建 shell 提供支持标准 unified diff 的 `apply_patch` 命令，不修改 Host 的 PATH 或原生 Standard shell provider。
+
 **从源码运行**
 
 ```sh
