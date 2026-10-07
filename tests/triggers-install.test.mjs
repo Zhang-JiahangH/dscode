@@ -183,7 +183,7 @@ test('a poll source only runs when its check says there is work', async t => {
 
   write('echo found a new commit; exit 0');
   assert.equal(await runTriggerCli(['run', 'nightly'], { ...deps, now: NOW + 60 * 1000 }), 0);
-  assert.equal(spawns, 1, 'the first match in a window runs');
+  assert.equal(spawns, 1, `the first match in a window runs: ${JSON.stringify(readRuns(f.home, { triggerId: 'nightly' }))}`);
   // A replayed scheduler tick in the SAME window is the same firing, so it does
   // not start a second session; only the next window re-evaluates the check.
   assert.equal(await runTriggerCli(['run', 'nightly'], { ...deps, now: NOW + 2 * 60 * 1000 }), 0);

@@ -85,6 +85,11 @@ Updated remote macOS and Linux x64 CI results remain required; local passes do
 not supersede a remote red check. Evidence is retained under
 `artifacts/local/pr6-*`.
 
+Remote follow-up at 70ccc4a still failed the Linux x64 poll fixture, despite the
+local ARM64 container pass. The assertion now includes its fixture-only persisted
+check output so a runner-specific sandbox failure is visible in CI, rather than
+reporting only the resulting zero session count. Remote qualification remains open.
+
 ## Distribution readiness review — 2026-10-07
 
 The current working tree supports a controlled macOS Apple Silicon Desktop
