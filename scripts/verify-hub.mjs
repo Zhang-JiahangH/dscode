@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, cpSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -16,7 +15,11 @@ const read = path=>JSON.parse(readFileSync(path,'utf8'));
 const release=read(join(out,'hub-release.json'));
 const pkg=read(join(out,'bundle/package.json'));
 const pack=read(join(out,'bundle-pack.json'))[0];
-const home=mkdtempSync(join(tmpdir(),'dscode-hub-verify-'));
+// Linux workspace-write hides /tmp outside the active workspace. Keep the
+// installed runtime outside that scratch mount, as a normal Hub home would be.
+const verificationRoot=join(root,'artifacts/local');
+mkdirSync(verificationRoot,{recursive:true});
+const home=mkdtempSync(join(verificationRoot,'dscode-hub-verify-'));
 const launcherRoot=join(home,'launcher');
 const launcherPack=read(join(out,'launcher-pack.json'))[0];
 await new Promise((resolve,reject)=>{

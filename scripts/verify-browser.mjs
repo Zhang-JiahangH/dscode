@@ -14,8 +14,8 @@ const home = await mkdtemp(join(tmpdir(), 'dscode-browser-e2e-'));
 const outside = await mkdtemp(join(tmpdir(), 'dscode-browser-outside-'));
 const config = { mode: 'persistent', headless: true, ...(process.env.DSCODE_TEST_CHROME ? { executablePath: process.env.DSCODE_TEST_CHROME } : {}) };
 const html = `<!doctype html><html><head><title>Browser fixture</title></head><body>
-<h1>Browser fixture</h1><form><label>Name <input name="name"></label><button>Save</button></form>
-<button id="dialog">Confirm fixture</button><label>Attachment <input type="file"></label><output id="result">Ready</output>
+<h1>Browser fixture</h1><form><label>Name <input name="name" aria-label="Name"></label><button>Save</button></form>
+<button id="dialog">Confirm fixture</button><label>Attachment <input type="file" aria-label="Attachment"></label><output id="result">Ready</output>
 <script>
 console.log('browser-fixture-console');
 document.querySelector('form').onsubmit = async e => { e.preventDefault(); const response = await fetch('/save',{method:'POST',body:document.querySelector('input').value}); document.querySelector('output').textContent = await response.text(); };

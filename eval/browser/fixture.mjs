@@ -49,15 +49,15 @@ export async function createFixture(id) {
     else if (url.pathname === '/details' && id === 'reservation') {
       const product = url.searchParams.get('product') === 'atlas-blue' ? 'atlas-blue' : 'atlas-red';
       page = html('Reservation details', `<p>Product: ${product}</p><form>
-        <label>Quantity <input name="quantity" type="number" min="1" max="5" value="1" required></label><br>
-        <label>Full name <input name="name" required></label><br>
+        <label>Quantity <input name="quantity" aria-label="Quantity" type="number" min="1" max="5" value="1" required></label><br>
+        <label>Full name <input name="name" aria-label="Full name" required></label><br>
         <label><input name="marketing" type="checkbox">Send marketing updates</label><br>
         <button>Confirm reservation</button></form><output aria-live="polite">Not submitted</output>
         <script>${save('/api/submit', `{product:'${product}',quantity:Number(document.querySelector('[name=quantity]').value),name:document.querySelector('[name=name]').value,marketing:document.querySelector('[name=marketing]').checked}`)}</script>`);
     } else if (url.pathname === '/' && id === 'reference') page = html('Reference entry', `
       <p>Use the current code in the reference tab. Archived codes are invalid.</p>
       <a href="/reference" target="_blank" rel="noopener">Open reference tab</a>
-      <form><label>Current code <input name="code" required></label><button>Submit code</button></form>
+      <form><label>Current code <input name="code" aria-label="Current code" required></label><button>Submit code</button></form>
       <output aria-live="polite">Not submitted</output>
       <script>${save('/api/submit', "{code:document.querySelector('[name=code]').value}")}</script>`);
     else if (url.pathname === '/reference' && id === 'reference') page = html('Reference codes', `<p>Archived code: REF-expired</p><p>Current code: ${code}</p>`);

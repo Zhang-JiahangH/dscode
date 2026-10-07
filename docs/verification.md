@@ -28,6 +28,63 @@ The GitHub Actions workflow runs the gate on macOS with Node 22.19 and 24. Addin
 
 `npm run verify:hub` also runs `scripts/verify-installed-tui.mjs` against the isolated native installation. It imports the bundle's public `/startup` and `/tui` entries and checks their plugin exports, resolving their transitive dependencies from the installed profile. A `--dump-config` success alone does not exercise those imports. The verification receipt records `terminalImports: true`, which publication requires alongside the existing installation and lifecycle checks. This import check does not render the interactive terminal.
 
+## First remote CI results and fixture corrections — 2026-10-07
+
+The Browser/Desktop source was submitted as
+[PR #6](https://github.com/qiz029/dscode/pull/6), initially at a6f3d0c.
+All three initial required checks failed. Node 22.19 cancelled six account tests
+because the serverless watch fixture's only remaining timeout was unreferenced;
+the same failure was reproduced locally with the official Node 22.19 binary.
+The deadline test now supplies a bounded referenced timer, representing the
+live callback server's lifetime without changing production cancellation.
+
+The Linux run also failed the poll CLI case when bubblewrap could not create a
+namespace in Docker. A local container reproduced the original failure, and a
+direct bubblewrap probe reported `Creating new namespace failed: Operation not
+permitted`. Granting `SYS_ADMIN` to the disposable test container made the
+bubblewrap probe pass. Both the local e2e launcher and CI now supply that
+capability and disable the outer container's AppArmor profile, which can also
+deny mounts despite the capability (see
+[Docker's AppArmor mount example](https://github.com/docker-archive-public/docker.labs/blob/master/security/apparmor/README.md)).
+There are no host directory or Docker socket mounts. The existing real
+poll and script-ingress assertions remain in place; the production sandbox
+still refuses to fall back to an unsandboxed command.
+
+Once Linux could execute the sandboxed command, the exec probe exposed a second
+platform assumption: its blocking command waited for the macOS-only stdin
+inspector. Linux now exercises the existing explicit `exec --timeout 2` path,
+requiring exit 124 and the timeout diagnostic within 30 seconds. macOS retains
+the automatic stdin-wait interruption assertion. The focused Linux probe passed
+with a real PTY and exited in 7.3 seconds, including process startup and cleanup.
+
+The installed Hub probe subsequently reached the real patch command and found
+that its fixture installation under `/tmp` was hidden by Linux workspace-write's
+private temporary mount. A direct bubblewrap reproduction confirmed that the
+same helper remained visible outside `/tmp`. The fixture now installs under an
+isolated `artifacts/local/dscode-hub-verify-*` directory, matching the placement
+of a normal Hub installation outside scratch space. The sandbox and installed
+`apply_patch` assertion are unchanged.
+
+Node 24 passed its main regression gate, then failed the real browser fixture
+because the runner's Chrome preserved trailing spaces in accessible input
+names. Explicit accessible names on the browser and evaluation fixtures remove
+that ambiguity while retaining exact tool-target assertions.
+
+During diagnosis, local Node 22.19 passed the full regression gate, including a
+temporary additional process-result test: 1,048 unit/component cases, 80.81%
+measured first-party line coverage, both typechecks, native integration, package
+checks and 63 evaluator cases. The final fixture change retains the original
+1,047-case unit suite and fixes the Docker execution environment. The real
+Chrome suite and all three scripted browser evaluation scenarios passed on local
+Node 24. The Docker context now excludes local research, npm caches, environment
+files and local configuration. The final Linux ARM64 container passed all seven
+e2e stages in 3.8 minutes: 1,041 unit cases passed with six existing macOS-only
+skips, native integration, package verification, and the installed Hub lifecycle
+including actual shell edits, failed upgrade preservation and successful rollback.
+Updated remote macOS and Linux x64 CI results remain required; local passes do
+not supersede a remote red check. Evidence is retained under
+`artifacts/local/pr6-*`.
+
 ## Distribution readiness review — 2026-10-07
 
 The current working tree supports a controlled macOS Apple Silicon Desktop
