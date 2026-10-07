@@ -89,6 +89,15 @@ Remote follow-up at 70ccc4a still failed the Linux x64 poll fixture, despite the
 local ARM64 container pass. The assertion now includes its fixture-only persisted
 check output so a runner-specific sandbox failure is visible in CI, rather than
 reporting only the resulting zero session count. Remote qualification remains open.
+The output lives in each run's separate transcript tail, so the diagnostic reads
+that file rather than only the outcome index; a local denied-container test
+confirmed that the actual bubblewrap error reaches the assertion.
+
+The second remote Node 24 main gate passed, then attached-browser startup failed
+with an unavailable initial page list. The pinned Chrome MCP omits its pages field
+when no regular targets exist. The disposable Chrome fixture now waits for its
+original page target at the debugging endpoint before establishing MCP; it still
+asserts the actual tool inventory and preserves the original tab on disconnect.
 
 ## Distribution readiness review — 2026-10-07
 

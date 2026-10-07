@@ -200,6 +200,17 @@ try {
   }
   assert(port, 'Disposable debugging Chrome did not start');
   const endpoint = `http://127.0.0.1:${port}`;
+  // DevToolsActivePort precedes the initial page target on some Chrome builds.
+  // Wait for the fixture tab before MCP takes its initial page inventory.
+  let existingPageReady = false;
+  for (let i = 0; i < 100; i++) {
+    const targets = await fetch(endpoint + '/json/list').then(r => r.json());
+    if (targets.some(target => target.type === 'page' && target.url === url + '/existing')) {
+      existingPageReady = true; break;
+    }
+    await delay(100);
+  }
+  assert(existingPageReady, 'Disposable Chrome did not expose the original fixture tab');
   browser = new BrowserConnection({ home, sessionId: 'attached', config: { mode: 'connect', url: endpoint }, fileRoots: [home] });
   browser.args.push('--filesystem-root', home);
   await browser.start();
